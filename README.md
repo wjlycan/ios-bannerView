@@ -1,5 +1,9 @@
-# ios-bannerView
+# bannerView
 由于项目的需要，网上找了一些轮播图的实现，但是用在项目中总会有这样那样的bug，最后自己实现了一个，可以无限轮番播放，希望能帮助到一些人
+
+实现语言：objective-c
+
+关键字：轮播图 bannerView ios
 
 头文件：BannerView.h
 
