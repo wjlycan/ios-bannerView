@@ -21,9 +21,9 @@
 @property (weak, nonatomic) UIImageView *left;
 @property (weak, nonatomic) UIImageView *middle;
 @property (weak, nonatomic) UIImageView *right;
+@property (assign, nonatomic) NSUInteger pageIndex;
 @property (assign, nonatomic) NSUInteger scrollPageIndex;
-@property (assign, nonatomic) NSUInteger destPageIndex;
-@property (assign, nonatomic) NSUInteger oldDestPageIndex;
+@property (assign, nonatomic) NSUInteger oldPage;
 
 @property (weak, nonatomic) NSTimer *timer;
 @property (assign, nonatomic) NSUInteger timerInterval;
@@ -99,8 +99,9 @@
     [scrollView addSubview:imageView];
     _right = imageView;
     
-    _destPageIndex = my_MID_PAGE_INDEX;
-    _oldDestPageIndex = my_MAX_PAGE_INDEX;
+    _pageIndex = my_MID_PAGE_INDEX;
+    _scrollPageIndex = my_MID_PAGE_INDEX;
+    _oldPage = my_MAX_PAGE_INDEX;
     _canStopToPlay = NO;
     
     // 隐藏image view
@@ -127,10 +128,9 @@
          // 播放
          if( --_timerInterval == 0 ){
              _timerInterval = _changePageTimeInterval;
-             ++_destPageIndex;
+             ++_pageIndex;
              dispatch_async(dispatch_get_main_queue(), ^{
-                 [weakSelf adjustScrollViewOffsetAnimal:YES 
-                                              pageIndex:_destPageIndex];
+                 [weakSelf adjustScrollViewOffsetAnimal:YES];
              });
          }
      }];
@@ -145,7 +145,7 @@
     if( _delegate && 
         _pageControl.numberOfPages &&
         [_delegate respondsToSelector:@selector(banner:didSelectPage:)] ){
-        [_delegate banner:self didSelectPage:[self currentPageWithPageIndex:_destPageIndex]];
+        [_delegate banner:self didSelectPage:[self pageNumWithPageIndex:_scrollPageIndex]];
     }
 }
 
@@ -164,13 +164,13 @@
     frame.size.height = 37;
     _pageControl.frame = frame;
     
-    [self adjustPageFramesWithPageIndex:_destPageIndex];
-    [self adjustScrollViewOffsetAnimal:NO pageIndex:_destPageIndex];
+    [self adjustPageFramesWithPageIndex:_pageIndex];
+    [self adjustScrollViewOffsetAnimal:NO];
 }
 
-- (void)adjustScrollViewOffsetAnimal:(BOOL)animal pageIndex:(NSUInteger)pageIndex{
+- (void)adjustScrollViewOffsetAnimal:(BOOL)animal {
     CGRect bounds = self.bounds;
-    bounds.origin.x = pageIndex * bounds.size.width;
+    bounds.origin.x = _pageIndex * bounds.size.width;
     [_scrollView setContentOffset:bounds.origin animated:animal];
 }
 
@@ -197,20 +197,20 @@
 
 - (void)pageDidChange:(UIPageControl*)sender {
     if( _pageControl.numberOfPages > 1 ){
-        NSUInteger curPage = [self currentPageWithPageIndex:_destPageIndex];
+        NSUInteger curPage = [self pageNumWithPageIndex:_pageIndex];
         NSUInteger destPage = sender.currentPage;
         _timerInterval = _changePageTimeInterval;
         if( curPage != destPage ){
-            _destPageIndex += destPage - curPage;
+            _pageIndex += destPage - curPage;
             __weak BannerView *weakSelf = self;
             dispatch_async(dispatch_get_main_queue(), ^{
-                [weakSelf adjustScrollViewOffsetAnimal:YES pageIndex:_destPageIndex];
+                [weakSelf adjustScrollViewOffsetAnimal:YES];
             });
         }
     }
 }
 
-- (NSUInteger)currentPageWithPageIndex:(NSUInteger)pageIndex {
+- (NSUInteger)pageNumWithPageIndex:(NSUInteger)pageIndex{
     NSUInteger pageCount = _pageControl.numberOfPages;
     switch (pageCount) {
         case 0:
@@ -237,7 +237,7 @@
         pageCount = 0;
     }
     
-    _oldDestPageIndex = my_MAX_PAGE_INDEX;
+    _oldPage = my_MAX_PAGE_INDEX;
     
     switch (pageCount) {
         case 0:{
@@ -245,7 +245,8 @@
                 _scrollView.scrollEnabled = NO;
                 _pageControl.numberOfPages = 0;
                 _pageControl.hidden = YES;
-                _destPageIndex = my_MID_PAGE_INDEX;
+                _pageIndex = my_MID_PAGE_INDEX;
+                _scrollPageIndex = my_MID_PAGE_INDEX;
                 _middle.hidden = YES;
                 _right.hidden = YES;
                 _left.hidden = YES;
@@ -256,14 +257,15 @@
              __weak BannerView *weakSelf = self;
             dispatch_async(dispatch_get_main_queue(), ^{
                 _scrollView.scrollEnabled = NO;
-                _destPageIndex = my_MID_PAGE_INDEX;
+                _pageIndex = my_MID_PAGE_INDEX;
+                _scrollPageIndex = my_MID_PAGE_INDEX;
                 _pageControl.numberOfPages = 1;
                 _pageControl.currentPage = 0;
                 _pageControl.hidden = NO;
                 
                 [weakSelf loadPage:0];
-                [weakSelf adjustPageFramesWithPageIndex:_destPageIndex];
-                [weakSelf adjustScrollViewOffsetAnimal:NO pageIndex:_destPageIndex];
+                [weakSelf adjustPageFramesWithPageIndex:_pageIndex];
+                [weakSelf adjustScrollViewOffsetAnimal:NO];
                 
                 _middle.hidden = NO;
                 _right.hidden = YES;
@@ -284,11 +286,12 @@
                     page = pageCount-1;
                 }
                 _pageControl.currentPage = page;
-                _destPageIndex = my_MID_PAGE_INDEX + page;
+                _pageIndex = my_MID_PAGE_INDEX + page;
+                _scrollPageIndex = my_MID_PAGE_INDEX;
                 
                 [weakSelf loadPage:page];
-                [weakSelf adjustPageFramesWithPageIndex:_destPageIndex];
-                [weakSelf adjustScrollViewOffsetAnimal:NO pageIndex:_destPageIndex];
+                [weakSelf adjustPageFramesWithPageIndex:_pageIndex];
+                [weakSelf adjustScrollViewOffsetAnimal:NO];
                 
                 _middle.hidden = NO;
                 _right.hidden = NO;
@@ -301,7 +304,7 @@
 
 - (void)loadPage:(NSUInteger)page {
     if( !_delegate ||
-        _oldDestPageIndex == page ){
+        _oldPage == page ){
         return;
     }
     
@@ -311,14 +314,14 @@
             return;
         }
         case 1:{
-            if( _oldDestPageIndex == my_MAX_PAGE_INDEX ){
+            if( _oldPage == my_MAX_PAGE_INDEX ){
                 _middle.image = [_delegate banner:self imageForPage:0];
             }
             break;
         }
         case 2:{
             UIImage *image = nil;
-            if(_oldDestPageIndex == my_MAX_PAGE_INDEX){
+            if(_oldPage == my_MAX_PAGE_INDEX){
                 _middle.image = [_delegate banner:self imageForPage:page&1];
                 image = [_delegate banner:self imageForPage:(page+1)&1];
             } else {
@@ -332,15 +335,15 @@
         default:{
             NSUInteger leftPage = (page==0 ? pageCount-1 : page-1);
             NSUInteger rightPage = (page==pageCount-1 ? 0 : page+1);
-            if( _oldDestPageIndex == my_MAX_PAGE_INDEX ){
+            if( _oldPage == my_MAX_PAGE_INDEX ){
                 _left.image = [_delegate banner:self imageForPage:leftPage];
                 _middle.image = [_delegate banner:self imageForPage:page];
                 _right.image = [_delegate banner:self imageForPage:rightPage];
             } else {
-                NSUInteger oldLeftPage = (_oldDestPageIndex==0 ? pageCount-1 : _oldDestPageIndex-1);
-                NSUInteger oldRightPage = (_oldDestPageIndex==pageCount-1 ? 0 : _oldDestPageIndex+1);
+                NSUInteger oldLeftPage = (_oldPage==0 ? pageCount-1 : _oldPage-1);
+                NSUInteger oldRightPage = (_oldPage==pageCount-1 ? 0 : _oldPage+1);
                 UIImage *oldLeftImage = _left.image;
-                if(leftPage == _oldDestPageIndex){
+                if(leftPage == _oldPage){
                     _left.image = _middle.image;
                 } else if(leftPage == oldRightPage){
                     _left.image = _right.image;
@@ -356,7 +359,7 @@
                 } else {
                     _middle.image = [_delegate banner:self imageForPage:page];
                 }
-                if(rightPage == _oldDestPageIndex){
+                if(rightPage == _oldPage){
                     _right.image = oldMidImage;
                 } else if(rightPage == oldLeftPage){
                     _right.image = oldLeftImage;
@@ -367,7 +370,7 @@
             break;
         }
     }
-    _oldDestPageIndex = page;
+    _oldPage = page;
 }
 
 
@@ -375,30 +378,41 @@
 
 
 - (void)adjustPageIndex {
-    NSUInteger page = [self currentPageWithPageIndex:_scrollPageIndex];
+    NSUInteger page = [self pageNumWithPageIndex:_pageIndex];
     __weak BannerView *weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
         _pageControl.currentPage = page;
         NSUInteger pageIndex = my_MID_PAGE_INDEX + page;
-        if( _destPageIndex != pageIndex ){
-            _destPageIndex = pageIndex;
+        if( _pageIndex != pageIndex ){
+            _pageIndex = pageIndex;
             _scrollPageIndex = pageIndex;
             [weakSelf loadPage:page];
-            [weakSelf adjustPageFramesWithPageIndex:_destPageIndex];
-            [weakSelf adjustScrollViewOffsetAnimal:NO pageIndex:_destPageIndex];
+            [weakSelf adjustPageFramesWithPageIndex:pageIndex];
+            [weakSelf adjustScrollViewOffsetAnimal:NO];
         }
     });
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
     NSUInteger pageIndex = (NSUInteger)(scrollView.contentOffset.x/scrollView.frame.size.width);
-    if( pageIndex != _scrollPageIndex ){
+    if( _needStopToPlay ){
+         if(pageIndex != _pageIndex){
+             _pageIndex = pageIndex;
+             _scrollPageIndex = pageIndex;
+             NSUInteger page = [self pageNumWithPageIndex:pageIndex];
+             __weak BannerView *weakSelf = self;
+             dispatch_async(dispatch_get_main_queue(), ^{
+                 [weakSelf loadPage:page];
+                 [weakSelf adjustPageFramesWithPageIndex:pageIndex];
+             });
+         }
+    } else if( pageIndex != _scrollPageIndex ){
         _scrollPageIndex = pageIndex;
-        NSUInteger page = [self currentPageWithPageIndex:_scrollPageIndex];
+        NSUInteger page = [self pageNumWithPageIndex:pageIndex];
         __weak BannerView *weakSelf = self;
         dispatch_async(dispatch_get_main_queue(), ^{
             [weakSelf loadPage:page];
-            [weakSelf adjustPageFramesWithPageIndex:_scrollPageIndex];
+            [weakSelf adjustPageFramesWithPageIndex:pageIndex];
         });
     }
 }
@@ -408,14 +422,18 @@
 }
 
 - (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
-    _needStopToPlay = NO;
-    _timerInterval = _changePageTimeInterval;
     if( !decelerate ){
+        _needStopToPlay = NO;
+        _timerInterval = _changePageTimeInterval;
         [self adjustPageIndex];
-    }
+    } 
 }
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if( _needStopToPlay ){
+        _needStopToPlay = NO;
+        _timerInterval = _changePageTimeInterval;
+    }
     [self adjustPageIndex];
 }
 
