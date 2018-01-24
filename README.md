@@ -37,4 +37,5 @@ banner.changePageTimeInterval = 5;
 [self.view addSubview:banner];
 
 // 更新轮播图内容
+
 [banner reloadData];
