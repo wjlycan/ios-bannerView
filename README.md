@@ -30,6 +30,7 @@ frame.size.height = frame.size.width*0.618;
 frame.origin.y += (self.view.bounds.size.height - frame.size.height)/2;
 
 BannerView *banner = [[BannerView alloc] initWithFrame:frame];
+
 banner.delegate = self;
 
 banner.changePageTimeInterval = 5;
