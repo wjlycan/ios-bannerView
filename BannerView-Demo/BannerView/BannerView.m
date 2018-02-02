@@ -109,31 +109,30 @@
     
     // 自动播放定时器
     __weak BannerView *weakSelf = self;
-    _timer = 
-    [NSTimer scheduledTimerWithTimeInterval:1 
-                                    repeats:YES 
-                                      block:^(NSTimer * timer) 
-     {
-         // 播放控制
-         if( _needStopToPlay || // 外部控制
-            _canStopToPlay ){  // 内部遇到特殊情况时的控制
-             return;
-         }
-         
-         // 异常处理
-         if( _pageControl.numberOfPages <= 1 || !_delegate){
-             return;
-         }
-         
-         // 播放
-         if( --_timerInterval == 0 ){
-             _timerInterval = _changePageTimeInterval;
-             ++_pageIndex;
-             dispatch_async(dispatch_get_main_queue(), ^{
-                 [weakSelf adjustScrollViewOffsetAnimal:YES];
-             });
-         }
-     }];
+    NSTimer *timer = [NSTimer timerWithTimeInterval:1 
+                                            repeats:YES 
+                                              block:^(NSTimer * timer) 
+    {
+        // 播放控制
+        if( _needStopToPlay || // 外部控制
+           _canStopToPlay ){  // 内部遇到特殊情况时的控制
+            return;
+        }
+        
+        // 异常处理
+        if( _pageControl.numberOfPages <= 1 || !_delegate){
+            return;
+        }
+        
+        // 播放
+        if( --_timerInterval == 0 ){
+            _timerInterval = _changePageTimeInterval;
+            ++_pageIndex;
+            [weakSelf adjustScrollViewOffsetAnimal:YES];
+        }
+    }];
+    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSDefaultRunLoopMode];
+    _timer = timer;
 }
 
 - (void)dealloc {
@@ -152,7 +151,10 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     
+    CGRect layoutFrame = self.layoutMarginsGuide.layoutFrame;
     CGRect bounds = self.bounds;
+    bounds.origin.x = layoutFrame.origin.x - 8;
+    bounds.size.width = layoutFrame.size.width + 16;
     _scrollView.frame = bounds;
     
     CGSize contentSize = bounds.size;
@@ -169,13 +171,13 @@
 }
 
 - (void)adjustScrollViewOffsetAnimal:(BOOL)animal {
-    CGRect bounds = self.bounds;
+    CGRect bounds = _scrollView.bounds;
     bounds.origin.x = _pageIndex * bounds.size.width;
     [_scrollView setContentOffset:bounds.origin animated:animal];
 }
 
 - (void)adjustPageFramesWithPageIndex:(NSUInteger)pageIndex {
-    CGRect frame = self.bounds;
+    CGRect frame = _scrollView.bounds;
     frame.origin.x = (pageIndex-1) * frame.size.width;
     _left.frame = frame;
     
@@ -202,10 +204,7 @@
         _timerInterval = _changePageTimeInterval;
         if( curPage != destPage ){
             _pageIndex += destPage - curPage;
-            __weak BannerView *weakSelf = self;
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [weakSelf adjustScrollViewOffsetAnimal:YES];
-            });
+            [self adjustScrollViewOffsetAnimal:YES];
         }
     }
 }
@@ -241,7 +240,7 @@
     
     switch (pageCount) {
         case 0:{
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSRunLoop mainRunLoop] performInModes:@[NSDefaultRunLoopMode] block:^{
                 _scrollView.scrollEnabled = NO;
                 _pageControl.numberOfPages = 0;
                 _pageControl.hidden = YES;
@@ -250,12 +249,12 @@
                 _middle.hidden = YES;
                 _right.hidden = YES;
                 _left.hidden = YES;
-            });
+            }];
             return;
         }
         case 1:{
              __weak BannerView *weakSelf = self;
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSRunLoop mainRunLoop] performInModes:@[NSDefaultRunLoopMode] block:^{
                 _scrollView.scrollEnabled = NO;
                 _pageIndex = my_MID_PAGE_INDEX;
                 _scrollPageIndex = my_MID_PAGE_INDEX;
@@ -270,13 +269,13 @@
                 _middle.hidden = NO;
                 _right.hidden = YES;
                 _left.hidden = YES;
-            });
+            }];
             return;
         }
         
         default:{
             __weak BannerView *weakSelf = self;
-            dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSRunLoop mainRunLoop] performInModes:@[NSDefaultRunLoopMode] block:^{
                 _scrollView.scrollEnabled = YES;
                 _pageControl.numberOfPages = pageCount;
                 _pageControl.hidden = NO;
@@ -296,7 +295,7 @@
                 _middle.hidden = NO;
                 _right.hidden = NO;
                 _left.hidden = NO;
-            });
+            }];
             return;
         }
     }
@@ -379,18 +378,15 @@
 
 - (void)adjustPageIndex {
     NSUInteger page = [self pageNumWithPageIndex:_pageIndex];
-    __weak BannerView *weakSelf = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        _pageControl.currentPage = page;
-        NSUInteger pageIndex = my_MID_PAGE_INDEX + page;
-        if( _pageIndex != pageIndex ){
-            _pageIndex = pageIndex;
-            _scrollPageIndex = pageIndex;
-            [weakSelf loadPage:page];
-            [weakSelf adjustPageFramesWithPageIndex:pageIndex];
-            [weakSelf adjustScrollViewOffsetAnimal:NO];
-        }
-    });
+    _pageControl.currentPage = page;
+    NSUInteger pageIndex = my_MID_PAGE_INDEX + page;
+    if( _pageIndex != pageIndex ){
+        _pageIndex = pageIndex;
+        _scrollPageIndex = pageIndex;
+        [self loadPage:page];
+        [self adjustPageFramesWithPageIndex:pageIndex];
+        [self adjustScrollViewOffsetAnimal:NO];
+    }
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -400,20 +396,14 @@
              _pageIndex = pageIndex;
              _scrollPageIndex = pageIndex;
              NSUInteger page = [self pageNumWithPageIndex:pageIndex];
-             __weak BannerView *weakSelf = self;
-             dispatch_async(dispatch_get_main_queue(), ^{
-                 [weakSelf loadPage:page];
-                 [weakSelf adjustPageFramesWithPageIndex:pageIndex];
-             });
+             [self loadPage:page];
+             [self adjustPageFramesWithPageIndex:pageIndex];
          }
     } else if( pageIndex != _scrollPageIndex ){
         _scrollPageIndex = pageIndex;
         NSUInteger page = [self pageNumWithPageIndex:pageIndex];
-        __weak BannerView *weakSelf = self;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf loadPage:page];
-            [weakSelf adjustPageFramesWithPageIndex:pageIndex];
-        });
+        [self loadPage:page];
+        [self adjustPageFramesWithPageIndex:pageIndex];
     }
 }
 
@@ -422,11 +412,14 @@
 }
 
 - (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
-    if( !decelerate ){
+    if( decelerate ){
+        NSUInteger page = [self pageNumWithPageIndex:_scrollPageIndex];
+        _pageControl.currentPage = page;
+    } else {
         _needStopToPlay = NO;
         _timerInterval = _changePageTimeInterval;
         [self adjustPageIndex];
-    } 
+    }
 }
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
