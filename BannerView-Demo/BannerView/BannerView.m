@@ -57,12 +57,6 @@
     return self;
 }
 
--(instancetype)init {
-    if( self = [super init] ){
-        [self setup];
-    }
-    return self;
-}
 
 -(void)setup {
     UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectZero];
@@ -125,9 +119,11 @@
         }
         
         // 播放
+        NSLog(@"%d-%d-%d", _timerInterval, _changePageTimeInterval, _pageIndex);
         if( --_timerInterval == 0 ){
             _timerInterval = _changePageTimeInterval;
             ++_pageIndex;
+            NSLog(@"--%d-%d-%d", _timerInterval, _changePageTimeInterval, _pageIndex);
             [weakSelf adjustScrollViewOffsetAnimal:YES];
         }
     }];

@@ -13,6 +13,7 @@
 
 @interface ViewController () <BannerViewDelegate>
 @property (nonatomic) NSArray *images;
+@property (weak, nonatomic) BannerView *bannerView;
 @end
 
 @implementation ViewController
@@ -30,18 +31,23 @@
                 ];
     
     // 初始化轮播图
-    CGRect frame = self.view.bounds;
-    frame.size.height = frame.size.width*0.618;
-    frame.origin.y += (self.view.bounds.size.height - frame.size.height)/2;
-    BannerView *banner = [[BannerView alloc] initWithFrame:frame];
+    
+    BannerView *banner = [[BannerView alloc] init];
     banner.delegate = self;
     banner.changePageTimeInterval = 5;
     [self.view addSubview:banner];
     
     // 更新轮播图内容
     [banner reloadData];
+    _bannerView = banner;
 }
 
+- (void)viewWillLayoutSubviews {
+    CGRect frame = self.view.bounds;
+    frame.size.height = frame.size.width*0.618;
+    frame.origin.y += (self.view.bounds.size.height - frame.size.height)/2;
+    _bannerView.frame = frame;
+}
 
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
